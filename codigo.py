@@ -1,44 +1,47 @@
+import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
+import seaborn as sns
 
-def analyze_demographic_data():
-    data = pd.read_csv('path/to/dataset.csv')
+df = pd.read_csv('medical_examination.csv')
 
-    race_count = data['race'].value_counts()
+df['overweight'] = (df['weight'] / (df['height'] / 100) ** 2 > 25).astype(int)
 
-    average_age_men = data[data['sex'] == 'Male']['age'].mean()
+df['cholesterol'] = (df['cholesterol'] > 1).astype(int)
+df['gluc'] = (df['gluc'] > 1).astype(int)
 
-    bachelors_percentage = (data['education'].value_counts(normalize=True)['Bachelors'] * 100).round(1)
 
-    advanced_education = data[data['education'].isin(['Bachelors', 'Masters', 'Doctorate'])]
-    percentage_advanced_50K = (advanced_education[advanced_education['salary'] == '>50K'].shape[0] / advanced_education.shape[0] * 100).round(1)
 
-    non_advanced_education = data[~data['education'].isin(['Bachelors', 'Masters', 'Doctorate'])]
-    percentage_non_advanced_50K = (non_advanced_education[non_advanced_education['salary'] == '>50K'].shape[0] / non_advanced_education.shape[0] * 100).round(1)
+def draw_cat_plot():
+    df_cat = pd.melt(df, id_vars=['cardio'],
+                     value_vars=['cholesterol', 'gluc', 'smoke', 'alco', 'active', 'overweight'])
 
-    min_hours_per_week = data['hours-per-week'].min()
+    df_cat = df_cat.groupby(['cardio', 'variable', 'value']).size().reset_index()
+    df_cat = df_cat.rename(columns={0: 'total'})
 
-    min_hours_salary = data[data['hours-per-week'] == min_hours_per_week]
-    percentage_min_hours_50K = (min_hours_salary[min_hours_salary['salary'] == '>50K'].shape[0] / min_hours_salary.shape[0] * 100).round(1)
+    graph = sns.catplot(data=df_cat, kind="bar", x="variable", y="total", hue="value", col="cardio")
+    fig = graph.fig
 
-    country_salary = data[data['salary'] == '>50K']['native-country'].value_counts(normalize=True) * 100
-    highest_percentage_country = country_salary.idxmax()
-    highest_percentage_value = country_salary.max().round(1)
+    fig.savefig('catplot.png')
+    return fig
 
-    popular_occupation_india = data[(data['native-country'] == 'India') & (data['salary'] == '>50K')]['occupation'].mode()[0]
 
-    return {
-        'race_count': race_count,
-        'average_age_men': average_age_men,
-        'bachelors_percentage': bachelors_percentage,
-        'percentage_advanced_50K': percentage_advanced_50K,
-        'percentage_non_advanced_50K': percentage_non_advanced_50K,
-        'min_hours_per_week': min_hours_per_week,
-        'percentage_min_hours_50K': percentage_min_hours_50K,
-        'highest_percentage_country': highest_percentage_country,
-        'highest_percentage_value': highest_percentage_value,
-        'popular_occupation_india': popular_occupation_india,
-    }
+def draw_heat_map():
+    df_heat = df[(df['ap_lo'] <= df['ap_hi']) &
+                 (df['height'] >= df['height'].quantile(0.025)) &
+                 (df['height'] <= df['height'].quantile(0.975)) &
+                 (df['weight'] >= df['weight'].quantile(0.025)) &
+                 (df['weight'] <= df['weight'].quantile(0.975))
+                 ]
 
-if __name__ == '__main__':
-    results = analyze_demographic_data()
-    print(results)
+    corr = df_heat.corr()
+
+    mask = np.triu(np.ones_like(corr, dtype=bool))
+
+    fig, ax = plt.subplots(figsize=(16, 9))
+
+
+    sns.heatmap(corr, mask=mask, square=True, linewidths=0.5, annot=True, fmt="0.1f")
+
+    fig.savefig('heatmap.png')
+    return fig
